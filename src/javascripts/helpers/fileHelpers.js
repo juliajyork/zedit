@@ -26,6 +26,22 @@ fh.path = jetpack.path;
 // log app directory for reference
 console.log('App directory: ' + fh.appPath);
 
+fh.directoryExists = function(path) {
+    try {
+        return jetpack.exists(path) === 'dir';
+    } catch (x) {
+        return false;
+    }
+};
+
+fh.fileExists = function(path) {
+    try {
+        return jetpack.exists(path) === 'file';
+    } catch (x) {
+        return false;
+    }
+};
+
 fh.loadJsonFile = function(filePath) {
     if (jetpack.exists(filePath) === 'file')
         return jetpack.read(filePath, 'json');
@@ -68,7 +84,7 @@ fh.deleteEmptyFolders = function(folder) {
 };
 
 fh.delete = function(path) {
-    if(!fs.existsSync(path)) return;
+    if (!fs.existsSync(path)) return;
     let isDir = fs.lstatSync(path).isDirectory();
     if (!isDir) return fs.unlinkSync(path);
     fs.readdirSync(path).forEach(file => {
@@ -152,6 +168,8 @@ fh.getDirectories = function(path) {
 
 fh.getFiles = function(path, options) {
     if (jetpack.exists(path) !== 'dir') return [];
+    if (!options.hasOwnProperty('ignoreCase'))
+        options.ignoreCase = true;
     return jetpack.find(path, options)
         .map(path => jetpack.path(path));
 };
@@ -168,7 +186,7 @@ fh.getRegistryValues = function(hkey, path) {
 
 // helper function for selecting a directory
 fh.selectDirectory = function(title, defaultPath) {
-    let selection = remote.dialog.showOpenDialog({
+    let selection = remote.dialog.showOpenDialogSync({
         title: title,
         defaultPath: defaultPath,
         properties: ['openDirectory']
@@ -177,7 +195,7 @@ fh.selectDirectory = function(title, defaultPath) {
 };
 
 fh.selectFile = function(title, defaultPath, filters = []) {
-    let selection = remote.dialog.showOpenDialog({
+    let selection = remote.dialog.showOpenDialogSync({
         title: title,
         defaultPath: defaultPath,
         filters: filters,

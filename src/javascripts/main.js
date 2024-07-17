@@ -12,6 +12,11 @@ global.env = require('./env');
 global.argv = process.argv;
 
 let mainWindow, progressWindow, showProgressTimeout, lastProgressMessage;
+let baseWebPreferences = {
+    nodeIntegration: true,
+    contextIsolation: false,
+    enableRemoteModule: true
+};
 
 let logger = new Logger();
 logger.init('main');
@@ -23,6 +28,12 @@ logger.info(`Using arch ${process.arch}`);
 if (env.name !== 'production') {
     let userDataPath = app.getPath('userData');
     app.setPath('userData', `${userDataPath} (${env.name})`);
+}
+
+// external debugger support
+if (env.externalDebugger || process.argv.includes('--external-debugger')) {
+    app.commandLine.appendSwitch('remote-debugging-port', '9222');
+    logger.info('Remote debugging enabled on port 9222.');
 }
 
 let getPageUrl = function(page) {
@@ -69,8 +80,10 @@ let openMainWindow = function() {
     mainWindow = createWindow('main', {
         frame: false,
         show: false,
-        backgroundColor: '#555',
-        webPreferences: { nodeIntegration: true }
+        webPreferences: {
+            ...baseWebPreferences,
+            backgroundColor: '#555'
+        }
     });
     logger.info('Main window created');
     logger.info('Loading application...');
@@ -86,25 +99,31 @@ let openMainWindow = function() {
 
 let openProgressWindow = function() {
     let t = !process.argv.includes('--disable-transparency'),
-        m = !process.argv.includes('--inspector-fix');
+        debugProgress = process.argv.includes('--debug-progress');
     logger.info(`Window transparency is ${t ? 'en' : 'dis'}abled`);
-    logger.info(`Progress window is${m ? ' not ' : ' '}modal`);
+    logger.info(`Progress window is${debugProgress ? ' not ' : ' '}modal`);
     logger.info('Creating progress window...');
-    progressWindow = new BrowserWindow({
-        parent: mainWindow,
+
+    let progressWindowOptions = {
         title: "zEdit Progress",
-        modal: m,
+        modal: !debugProgress,
         show: true,
-        frame: false,
+        frame: debugProgress,
         closable: false,
         transparent: t,
         focusable: true,
-        maximizable: false,
-        minimizable: false,
-        resizable: false,
-        movabale: false,
-        webPreferences: { nodeIntegration: true }
-    });
+        maximizable: debugProgress,
+        minimizable: debugProgress,
+        resizable: debugProgress,
+        movabale: debugProgress,
+        webPreferences: { ...baseWebPreferences }
+    };
+    if (debugProgress) {
+        progressWindowOptions.width = 900;
+        progressWindowOptions.height = 1000;
+    }
+
+    progressWindow = new BrowserWindow(progressWindowOptions);
     progressWindow.hide();
     loadPage(progressWindow, 'progress.html');
     logger.info('Progress window created');
@@ -129,6 +148,7 @@ let crashHandler = function()  {
 };
 
 let createWindows = function() {
+    app.allowRendererProcessReuse = false;
     logger.info('Creating windows');
     openMainWindow();
     mainWindow.webContents.on('crash', crashHandler);
